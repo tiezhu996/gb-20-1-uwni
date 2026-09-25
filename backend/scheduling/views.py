@@ -23,6 +23,18 @@ from .pdf_export import (
 )
 
 
+def entries_with_week_type(queryset):
+    """取出冲突检测所需的条目字段，并带上课程的周次类型。"""
+    entries = []
+    for entry in queryset.values(
+        'id', 'teacher_id', 'classroom_id', 'class_id',
+        'day_of_week', 'period', 'course__week_type'
+    ):
+        entry['week_type'] = entry.pop('course__week_type') or 'weekly'
+        entries.append(entry)
+    return entries
+
+
 class ClassCourseViewSet(viewsets.ModelViewSet):
     queryset = ClassCourse.objects.all()
     serializer_class = ClassCourseSerializer
@@ -114,7 +126,8 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
                 preferred_room_type=cc.course.preferred_room_type,
                 priority=cc.course.priority,
                 available_time_slots=[],
-                classroom_capacity=cc.class_id.student_count or 40
+                classroom_capacity=cc.class_id.student_count or 40,
+                week_type=cc.course.week_type
             ))
 
         classrooms_data = {
@@ -138,9 +151,11 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
                 semester=semester, is_locked=True
             ).values(
                 'id', 'class_id', 'teacher_id', 'classroom_id',
-                'day_of_week', 'period', 'is_locked'
+                'day_of_week', 'period', 'is_locked', 'course__week_type'
             )
-            locked_entries = list(locked)
+            for entry in locked:
+                entry['week_type'] = entry.pop('course__week_type') or 'weekly'
+                locked_entries.append(entry)
 
         scheduler = CSPScheduler(semester)
         assignments, scheduling_conflicts = scheduler.schedule(
@@ -171,12 +186,12 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
                 ))
             ScheduleEntry.objects.bulk_create(bulk_entries)
 
-            all_entries = ScheduleEntry.objects.filter(
-                semester=semester
-            ).values('id', 'teacher_id', 'classroom_id', 'class_id', 'day_of_week', 'period')
+            all_entries = entries_with_week_type(
+                ScheduleEntry.objects.filter(semester=semester)
+            )
 
             detector = ConflictDetector()
-            conflicts = detector.detect_conflicts(list(all_entries))
+            conflicts = detector.detect_conflicts(all_entries)
 
             Conflict.objects.filter(semester=semester).delete()
             bulk_conflicts = []
@@ -218,12 +233,12 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
             return Response(req_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         semester_id = req_serializer.validated_data['semester_id']
-        entries = ScheduleEntry.objects.filter(
-            semester_id=semester_id
-        ).values('id', 'teacher_id', 'classroom_id', 'class_id', 'day_of_week', 'period')
+        entries = entries_with_week_type(
+            ScheduleEntry.objects.filter(semester_id=semester_id)
+        )
 
         detector = ConflictDetector()
-        conflicts = detector.detect_conflicts(list(entries))
+        conflicts = detector.detect_conflicts(entries)
 
         return Response({'conflicts': conflicts})
 

@@ -31,6 +31,7 @@ class ScheduleEntryDetailSerializer(serializers.ModelSerializer):
     teacher_name = serializers.CharField(source='teacher.name', read_only=True)
     classroom_name = serializers.CharField(source='classroom.name', read_only=True)
     class_name = serializers.CharField(source='class_id.name', read_only=True)
+    week_type = serializers.CharField(source='course.week_type', read_only=True)
     original_teacher_name = serializers.CharField(
         source='original_teacher.name', read_only=True, allow_null=True
     )

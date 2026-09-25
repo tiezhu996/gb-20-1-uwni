@@ -83,6 +83,15 @@ import type {
             </mat-option>
           </mat-select>
         </mat-form-field>
+
+        <mat-form-field class="filter-select">
+          <mat-label>周次</mat-label>
+          <mat-select [(value)]="weekTypeFilter">
+            <mat-option value="all">全部</mat-option>
+            <mat-option value="odd">单周</mat-option>
+            <mat-option value="even">双周</mat-option>
+          </mat-select>
+        </mat-form-field>
       </div>
 
       <div class="action-bar">
@@ -143,6 +152,9 @@ import type {
                         <div class="schedule-detail">{{ entry.classroom_name }}</div>
                         <div class="schedule-detail">{{ entry.class_name }}</div>
                         <div style="margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap;">
+                          <mat-chip *ngIf="entry.week_type && entry.week_type !== 'weekly'" color="primary" selected>
+                            {{ weekTypeLabels[entry.week_type] }}
+                          </mat-chip>
                           <mat-chip *ngIf="entry.is_locked" color="accent" selected>锁定</mat-chip>
                           <mat-chip *ngIf="entry.is_conflict" color="warn" selected>冲突</mat-chip>
                           <button
@@ -195,8 +207,15 @@ export class TimetableComponent implements OnInit {
   selectedTeacherId: number | null = null;
   selectedClassroomId: number | null = null;
   viewMode: 'class' | 'teacher' | 'classroom' = 'class';
+  weekTypeFilter: 'all' | 'odd' | 'even' = 'all';
   schedulingMessage: string = '';
   currentSemester: Semester | null = null;
+
+  weekTypeLabels: Record<string, string> = {
+    weekly: '每周',
+    odd: '单周',
+    even: '双周'
+  };
 
   weekDays = ['星期一', '星期二', '星期三', '星期四', '星期五'];
   periods = [
@@ -319,7 +338,15 @@ export class TimetableComponent implements OnInit {
   }
 
   getEntryAt(day: number, period: number): ScheduleEntry[] {
-    return this.schedules.filter(e => e.day_of_week === day && e.period === period);
+    return this.schedules.filter(
+      e => e.day_of_week === day && e.period === period && this.matchesWeekType(e)
+    );
+  }
+
+  matchesWeekType(entry: ScheduleEntry): boolean {
+    if (this.weekTypeFilter === 'all') return true;
+    const weekType = entry.week_type || 'weekly';
+    return weekType === 'weekly' || weekType === this.weekTypeFilter;
   }
 
   runAutoSchedule(respectLocked = true): void {

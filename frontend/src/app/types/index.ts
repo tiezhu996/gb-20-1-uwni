@@ -33,10 +33,13 @@ export interface Class {
   updated_at?: string;
 }
 
+export type WeekType = 'weekly' | 'odd' | 'even';
+
 export interface Course {
   id: number;
   name: string;
   weekly_hours: number;
+  week_type: WeekType;
   preferred_room_type: 'normal' | 'lab' | 'multimedia';
   priority: 'high' | 'medium' | 'low';
   is_active: boolean;
@@ -81,6 +84,7 @@ export interface ScheduleEntry {
   is_locked: boolean;
   is_conflict: boolean;
   conflict_type?: string;
+  week_type?: WeekType;
   original_teacher?: number;
   original_teacher_name?: string;
   course_name?: string;

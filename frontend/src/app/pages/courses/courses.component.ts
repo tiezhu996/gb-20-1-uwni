@@ -22,6 +22,12 @@ const PRIORITIES = [
   { value: 'low', label: '低优先级' }
 ];
 
+const WEEK_TYPES = [
+  { value: 'weekly', label: '每周' },
+  { value: 'odd', label: '单周' },
+  { value: 'even', label: '双周' }
+];
+
 @Component({
   selector: 'app-courses',
   standalone: true,
@@ -65,6 +71,15 @@ const PRIORITIES = [
           </mat-form-field>
 
           <mat-form-field class="full-width-field">
+            <mat-label>上课周次</mat-label>
+            <mat-select formControlName="week_type" required>
+              <mat-option *ngFor="let w of weekTypes" [value]="w.value">
+                {{ w.label }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field class="full-width-field">
             <mat-label>适用教室类型</mat-label>
             <mat-select formControlName="preferred_room_type" required>
               <mat-option *ngFor="let t of roomTypes" [value]="t.value">
@@ -103,6 +118,11 @@ const PRIORITIES = [
             <td mat-cell *matCellDef="let item">{{ item.weekly_hours }}</td>
           </ng-container>
 
+          <ng-container matColumnDef="week_type">
+            <th mat-header-cell *matHeaderCellDef>上课周次</th>
+            <td mat-cell *matCellDef="let item">{{ getWeekTypeLabel(item.week_type) }}</td>
+          </ng-container>
+
           <ng-container matColumnDef="preferred_room_type">
             <th mat-header-cell *matHeaderCellDef>适用教室</th>
             <td mat-cell *matCellDef="let item">{{ getRoomTypeLabel(item.preferred_room_type) }}</td>
@@ -138,10 +158,11 @@ const PRIORITIES = [
   `
 })
 export class CoursesComponent implements OnInit {
-  displayedColumns: string[] = ['name', 'weekly_hours', 'preferred_room_type', 'priority', 'is_active', 'actions'];
+  displayedColumns: string[] = ['name', 'weekly_hours', 'week_type', 'preferred_room_type', 'priority', 'is_active', 'actions'];
   dataSource: Course[] = [];
   roomTypes = ROOM_TYPES;
   priorities = PRIORITIES;
+  weekTypes = WEEK_TYPES;
   showForm = false;
   editingId: number | null = null;
   form: FormGroup;
@@ -154,6 +175,7 @@ export class CoursesComponent implements OnInit {
       id: [null],
       name: ['', Validators.required],
       weekly_hours: [2, [Validators.required, Validators.min(1)]],
+      week_type: ['weekly', Validators.required],
       preferred_room_type: ['normal', Validators.required],
       priority: ['medium', Validators.required],
       is_active: [true]
@@ -172,6 +194,10 @@ export class CoursesComponent implements OnInit {
     return this.priorities.find(p => p.value === priority)?.label || priority;
   }
 
+  getWeekTypeLabel(weekType: string): string {
+    return this.weekTypes.find(w => w.value === weekType)?.label || weekType;
+  }
+
   loadData(): void {
     this.api.getCourses().subscribe(data => {
       this.dataSource = data;
@@ -183,6 +209,7 @@ export class CoursesComponent implements OnInit {
     this.form.reset({
       name: '',
       weekly_hours: 2,
+      week_type: 'weekly',
       preferred_room_type: 'normal',
       priority: 'medium',
       is_active: true

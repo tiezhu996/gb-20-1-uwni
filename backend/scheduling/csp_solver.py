@@ -16,6 +16,16 @@ class TimeSlot:
         return self.day == other.day and self.period == other.period
 
 
+def week_types_overlap(week_type1: str, week_type2: str) -> bool:
+    """判断两种周次类型是否存在同一周都要上课的情况。
+
+    每周课与任何类型都重叠；单周课与双周课错开上课，互不占用。
+    """
+    if week_type1 == 'weekly' or week_type2 == 'weekly':
+        return True
+    return week_type1 == week_type2
+
+
 @dataclass
 class SchedulingTask:
     class_id: int
@@ -26,6 +36,7 @@ class SchedulingTask:
     priority: str
     available_time_slots: List[TimeSlot]
     classroom_capacity: int
+    week_type: str = 'weekly'
 
 
 class CSPScheduler:
@@ -43,6 +54,23 @@ class CSPScheduler:
         self.class_usage = defaultdict(set)
         self.assignments = []
         self.conflicts = []
+
+    @staticmethod
+    def _slot_occupied(
+        usage: Set[Tuple[TimeSlot, str]],
+        time_slot: TimeSlot,
+        week_type: str
+    ) -> bool:
+        """时段是否已被同周次的课程占用。
+
+        usage 中记录 (时段, 周次类型)，单周与双周互不占用，
+        每周课与任何周次类型互相占用。
+        """
+        if (time_slot, 'weekly') in usage or (time_slot, week_type) in usage:
+            return True
+        return week_type == 'weekly' and (
+            (time_slot, 'odd') in usage or (time_slot, 'even') in usage
+        )
 
     def generate_time_slots_for_priority(self, priority: str) -> List[TimeSlot]:
         morning_periods = min(4, self.daily_periods)
@@ -65,6 +93,7 @@ class CSPScheduler:
     def is_available(
         self,
         time_slot: TimeSlot,
+        week_type: str,
         teacher_id: int,
         class_id: int,
         classroom_id: int,
@@ -72,11 +101,11 @@ class CSPScheduler:
     ) -> bool:
         if teacher_available_slots and time_slot not in teacher_available_slots:
             return False
-        if time_slot in self.teacher_usage[teacher_id]:
+        if self._slot_occupied(self.teacher_usage[teacher_id], time_slot, week_type):
             return False
-        if time_slot in self.class_usage[class_id]:
+        if self._slot_occupied(self.class_usage[class_id], time_slot, week_type):
             return False
-        if time_slot in self.classroom_usage[classroom_id]:
+        if self._slot_occupied(self.classroom_usage[classroom_id], time_slot, week_type):
             return False
         return True
 
@@ -112,9 +141,10 @@ class CSPScheduler:
         if locked_entries:
             for entry in locked_entries:
                 slot = TimeSlot(day=entry['day_of_week'], period=entry['period'])
-                self.classroom_usage[entry['classroom_id']].add(slot)
-                self.teacher_usage[entry['teacher_id']].add(slot)
-                self.class_usage[entry['class_id']].add(slot)
+                week_type = entry.get('week_type') or 'weekly'
+                self.classroom_usage[entry['classroom_id']].add((slot, week_type))
+                self.teacher_usage[entry['teacher_id']].add((slot, week_type))
+                self.class_usage[entry['class_id']].add((slot, week_type))
                 self.assignments.append(entry)
 
         priority_order = {'high': 0, 'medium': 1, 'low': 2}
@@ -157,6 +187,7 @@ class CSPScheduler:
                 for room in compatible_rooms:
                     if self.is_available(
                         slot,
+                        task.week_type,
                         task.teacher_id,
                         task.class_id,
                         room,
@@ -166,9 +197,9 @@ class CSPScheduler:
                         break
 
                 if available_room:
-                    self.classroom_usage[available_room].add(slot)
-                    self.teacher_usage[task.teacher_id].add(slot)
-                    self.class_usage[task.class_id].add(slot)
+                    self.classroom_usage[available_room].add((slot, task.week_type))
+                    self.teacher_usage[task.teacher_id].add((slot, task.week_type))
+                    self.class_usage[task.class_id].add((slot, task.week_type))
 
                     self.assignments.append({
                         'semester_id': self.semester.id,
@@ -193,6 +224,24 @@ class CSPScheduler:
 
 
 class ConflictDetector:
+    @staticmethod
+    def _clashing_entries(entries: List[Dict]) -> List[Dict]:
+        """筛选出周次重叠（同一周都要上课）而相互挤占的条目。
+
+        单周课与双周课错开上课，即使同一时段也不算冲突。
+        """
+        clashing = []
+        for i, entry in enumerate(entries):
+            week_type = entry.get('week_type') or 'weekly'
+            for j, other in enumerate(entries):
+                if i == j:
+                    continue
+                other_week_type = other.get('week_type') or 'weekly'
+                if week_types_overlap(week_type, other_week_type):
+                    clashing.append(entry)
+                    break
+        return clashing
+
     def detect_conflicts(self, entries: List[Dict]) -> List[Dict]:
         conflicts = []
         by_slot = defaultdict(list)
@@ -212,33 +261,36 @@ class ConflictDetector:
                 class_map[entry['class_id']].append(entry)
 
             for tid, t_entries in teacher_map.items():
-                if len(t_entries) > 1:
+                clashing = self._clashing_entries(t_entries)
+                if len(clashing) > 1:
                     conflicts.append({
                         'conflict_type': 'teacher',
                         'day_of_week': day,
                         'period': period,
-                        'involved_entries': [e.get('id') for e in t_entries if e.get('id')],
-                        'message': f"教师 {tid} 同一时间有 {len(t_entries)} 门课"
+                        'involved_entries': [e.get('id') for e in clashing if e.get('id')],
+                        'message': f"教师 {tid} 同一时间有 {len(clashing)} 门课"
                     })
 
             for cid, c_entries in classroom_map.items():
-                if len(c_entries) > 1:
+                clashing = self._clashing_entries(c_entries)
+                if len(clashing) > 1:
                     conflicts.append({
                         'conflict_type': 'classroom',
                         'day_of_week': day,
                         'period': period,
-                        'involved_entries': [e.get('id') for e in c_entries if e.get('id')],
-                        'message': f"教室 {cid} 同一时间有 {len(c_entries)} 门课"
+                        'involved_entries': [e.get('id') for e in clashing if e.get('id')],
+                        'message': f"教室 {cid} 同一时间有 {len(clashing)} 门课"
                     })
 
             for clid, cl_entries in class_map.items():
-                if len(cl_entries) > 1:
+                clashing = self._clashing_entries(cl_entries)
+                if len(clashing) > 1:
                     conflicts.append({
                         'conflict_type': 'class',
                         'day_of_week': day,
                         'period': period,
-                        'involved_entries': [e.get('id') for e in cl_entries if e.get('id')],
-                        'message': f"班级 {clid} 同一时间有 {len(cl_entries)} 门课"
+                        'involved_entries': [e.get('id') for e in clashing if e.get('id')],
+                        'message': f"班级 {clid} 同一时间有 {len(clashing)} 门课"
                     })
 
         return conflicts
