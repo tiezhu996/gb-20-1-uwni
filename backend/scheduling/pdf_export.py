@@ -9,6 +9,29 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from .models import ScheduleEntry
 
+WEEK_PATTERN_LABELS = {'odd': '单周', 'even': '双周'}
+
+
+def _place_entries(schedule_grid, entries, num_periods, num_days, build_content):
+    """把排课记录填入表格单元格。
+
+    同一时段可能同时有一门单周课和一门双周课，合并显示并标注周次。
+    """
+    cell_contents = {}
+    for entry in entries:
+        row_idx = entry.period
+        col_idx = entry.day_of_week
+        if not (1 <= row_idx <= num_periods and 1 <= col_idx <= num_days):
+            continue
+        content = build_content(entry)
+        label = WEEK_PATTERN_LABELS.get(entry.week_pattern)
+        if label:
+            content += f"\n[{label}]"
+        cell_contents.setdefault((row_idx, col_idx), []).append(content)
+
+    for (row_idx, col_idx), parts in cell_contents.items():
+        schedule_grid[row_idx][col_idx] = '\n'.join(parts)
+
 
 def generate_class_timetable_pdf(class_obj, semester):
     buffer = BytesIO()
@@ -49,7 +72,8 @@ def generate_class_timetable_pdf(class_obj, semester):
 
     periods = []
     for p in semester.daily_periods:
-        periods.append(f"{p.get('name', f'第{p.get('order', len(periods)+1)}节')}")
+        order = p.get('order', len(periods) + 1)
+        periods.append(f"{p.get('name', f'第{order}节')}")
     if not periods:
         periods = [f'第{i+1}节' for i in range(7)]
 
@@ -65,19 +89,14 @@ def generate_class_timetable_pdf(class_obj, semester):
         semester=semester
     ).select_related('course', 'teacher', 'classroom')
 
-    for entry in entries:
-        try:
-            row_idx = entry.period
-            col_idx = entry.day_of_week
-            if 1 <= row_idx <= len(periods) and 1 <= col_idx <= len(days):
-                content = (
-                    f"{entry.course.name}\n"
-                    f"{entry.teacher.name}\n"
-                    f"{entry.classroom.name}"
-                )
-                schedule_grid[row_idx][col_idx] = content
-        except IndexError:
-            continue
+    _place_entries(
+        schedule_grid, entries, len(periods), len(days),
+        lambda entry: (
+            f"{entry.course.name}\n"
+            f"{entry.teacher.name}\n"
+            f"{entry.classroom.name}"
+        )
+    )
 
     col_widths = [2 * cm] + [(doc.width / len(days))] * len(days)
     row_heights = [1 * cm] + [1.8 * cm] * len(periods)
@@ -136,7 +155,8 @@ def generate_teacher_timetable_pdf(teacher, semester):
 
     periods = []
     for p in semester.daily_periods:
-        periods.append(f"{p.get('name', f'第{p.get('order', len(periods)+1)}节')}")
+        order = p.get('order', len(periods) + 1)
+        periods.append(f"{p.get('name', f'第{order}节')}")
     if not periods:
         periods = [f'第{i+1}节' for i in range(7)]
 
@@ -152,19 +172,14 @@ def generate_teacher_timetable_pdf(teacher, semester):
         semester=semester
     ).select_related('course', 'class_id', 'classroom')
 
-    for entry in entries:
-        try:
-            row_idx = entry.period
-            col_idx = entry.day_of_week
-            if 1 <= row_idx <= len(periods) and 1 <= col_idx <= len(days):
-                content = (
-                    f"{entry.course.name}\n"
-                    f"{entry.class_id.name}\n"
-                    f"{entry.classroom.name}"
-                )
-                schedule_grid[row_idx][col_idx] = content
-        except IndexError:
-            continue
+    _place_entries(
+        schedule_grid, entries, len(periods), len(days),
+        lambda entry: (
+            f"{entry.course.name}\n"
+            f"{entry.class_id.name}\n"
+            f"{entry.classroom.name}"
+        )
+    )
 
     col_widths = [2 * cm] + [(doc.width / len(days))] * len(days)
     row_heights = [1 * cm] + [1.8 * cm] * len(periods)
@@ -223,7 +238,8 @@ def generate_classroom_timetable_pdf(classroom, semester):
 
     periods = []
     for p in semester.daily_periods:
-        periods.append(f"{p.get('name', f'第{p.get('order', len(periods)+1)}节')}")
+        order = p.get('order', len(periods) + 1)
+        periods.append(f"{p.get('name', f'第{order}节')}")
     if not periods:
         periods = [f'第{i+1}节' for i in range(7)]
 
@@ -239,19 +255,14 @@ def generate_classroom_timetable_pdf(classroom, semester):
         semester=semester
     ).select_related('course', 'class_id', 'teacher')
 
-    for entry in entries:
-        try:
-            row_idx = entry.period
-            col_idx = entry.day_of_week
-            if 1 <= row_idx <= len(periods) and 1 <= col_idx <= len(days):
-                content = (
-                    f"{entry.course.name}\n"
-                    f"{entry.class_id.name}\n"
-                    f"{entry.teacher.name}"
-                )
-                schedule_grid[row_idx][col_idx] = content
-        except IndexError:
-            continue
+    _place_entries(
+        schedule_grid, entries, len(periods), len(days),
+        lambda entry: (
+            f"{entry.course.name}\n"
+            f"{entry.class_id.name}\n"
+            f"{entry.teacher.name}"
+        )
+    )
 
     col_widths = [2 * cm] + [(doc.width / len(days))] * len(days)
     row_heights = [1 * cm] + [1.8 * cm] * len(periods)

@@ -114,7 +114,8 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
                 preferred_room_type=cc.course.preferred_room_type,
                 priority=cc.course.priority,
                 available_time_slots=[],
-                classroom_capacity=cc.class_id.student_count or 40
+                classroom_capacity=cc.class_id.student_count or 40,
+                week_pattern=cc.course.week_pattern
             ))
 
         classrooms_data = {
@@ -138,7 +139,7 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
                 semester=semester, is_locked=True
             ).values(
                 'id', 'class_id', 'teacher_id', 'classroom_id',
-                'day_of_week', 'period', 'is_locked'
+                'day_of_week', 'period', 'week_pattern', 'is_locked'
             )
             locked_entries = list(locked)
 
@@ -167,13 +168,14 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
                     classroom_id=a['classroom_id'],
                     day_of_week=a['day_of_week'],
                     period=a['period'],
+                    week_pattern=a.get('week_pattern', 'weekly'),
                     is_locked=False
                 ))
             ScheduleEntry.objects.bulk_create(bulk_entries)
 
             all_entries = ScheduleEntry.objects.filter(
                 semester=semester
-            ).values('id', 'teacher_id', 'classroom_id', 'class_id', 'day_of_week', 'period')
+            ).values('id', 'teacher_id', 'classroom_id', 'class_id', 'day_of_week', 'period', 'week_pattern')
 
             detector = ConflictDetector()
             conflicts = detector.detect_conflicts(list(all_entries))
@@ -220,7 +222,7 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
         semester_id = req_serializer.validated_data['semester_id']
         entries = ScheduleEntry.objects.filter(
             semester_id=semester_id
-        ).values('id', 'teacher_id', 'classroom_id', 'class_id', 'day_of_week', 'period')
+        ).values('id', 'teacher_id', 'classroom_id', 'class_id', 'day_of_week', 'period', 'week_pattern')
 
         detector = ConflictDetector()
         conflicts = detector.detect_conflicts(list(entries))

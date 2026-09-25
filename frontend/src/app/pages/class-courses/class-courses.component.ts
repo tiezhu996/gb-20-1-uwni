@@ -64,7 +64,7 @@ import type { ClassCourse, Class, Course, Teacher, Semester } from '../../types'
             <mat-label>课程</mat-label>
             <mat-select formControlName="course" required>
               <mat-option *ngFor="let c of courses" [value]="c.id">
-                {{ c.name }} (每周{{ c.weekly_hours }}课时)
+                {{ c.name }} (每周{{ c.weekly_hours }}课时 · {{ getWeekPatternLabel(c.week_pattern) }})
               </mat-option>
             </mat-select>
           </mat-form-field>
@@ -107,6 +107,11 @@ import type { ClassCourse, Class, Course, Teacher, Semester } from '../../types'
             <td mat-cell *matCellDef="let item">{{ item.weekly_hours }}</td>
           </ng-container>
 
+          <ng-container matColumnDef="week_pattern">
+            <th mat-header-cell *matHeaderCellDef>上课周次</th>
+            <td mat-cell *matCellDef="let item">{{ getWeekPatternLabel(item.week_pattern) }}</td>
+          </ng-container>
+
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef>操作</th>
             <td mat-cell *matCellDef="let item" class="action-cell">
@@ -128,7 +133,7 @@ import type { ClassCourse, Class, Course, Teacher, Semester } from '../../types'
   `
 })
 export class ClassCoursesComponent implements OnInit {
-  displayedColumns: string[] = ['class_name', 'course_name', 'teacher_name', 'weekly_hours', 'actions'];
+  displayedColumns: string[] = ['class_name', 'course_name', 'teacher_name', 'weekly_hours', 'week_pattern', 'actions'];
   dataSource: ClassCourse[] = [];
   semesters: Semester[] = [];
   classes: Class[] = [];
@@ -192,6 +197,15 @@ export class ClassCoursesComponent implements OnInit {
         this.dataSource = data;
       });
     }
+  }
+
+  getWeekPatternLabel(pattern?: string): string {
+    const map: Record<string, string> = {
+      'weekly': '每周',
+      'odd': '单周',
+      'even': '双周'
+    };
+    return (pattern && map[pattern]) || '每周';
   }
 
   startCreate(): void {

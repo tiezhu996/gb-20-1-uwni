@@ -9,6 +9,7 @@ class ClassCourseSerializer(serializers.ModelSerializer):
     teacher_name = serializers.CharField(source='teacher.name', read_only=True)
     class_name = serializers.CharField(source='class_id.name', read_only=True)
     weekly_hours = serializers.IntegerField(source='course.weekly_hours', read_only=True)
+    week_pattern = serializers.CharField(source='course.week_pattern', read_only=True)
 
     class Meta:
         model = ClassCourse

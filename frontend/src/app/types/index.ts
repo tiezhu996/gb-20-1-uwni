@@ -1,3 +1,5 @@
+export type WeekPattern = 'weekly' | 'odd' | 'even';
+
 export interface Classroom {
   id: number;
   name: string;
@@ -37,6 +39,7 @@ export interface Course {
   id: number;
   name: string;
   weekly_hours: number;
+  week_pattern: WeekPattern;
   preferred_room_type: 'normal' | 'lab' | 'multimedia';
   priority: 'high' | 'medium' | 'low';
   is_active: boolean;
@@ -67,6 +70,7 @@ export interface ClassCourse {
   teacher_name?: string;
   class_name?: string;
   weekly_hours?: number;
+  week_pattern?: WeekPattern;
 }
 
 export interface ScheduleEntry {
@@ -78,6 +82,7 @@ export interface ScheduleEntry {
   classroom: number;
   day_of_week: number;
   period: number;
+  week_pattern: WeekPattern;
   is_locked: boolean;
   is_conflict: boolean;
   conflict_type?: string;

@@ -79,8 +79,20 @@ class Course(models.Model):
         ('low', '低优先级'),
     ]
 
+    WEEK_PATTERN_CHOICES = [
+        ('weekly', '每周'),
+        ('odd', '单周'),
+        ('even', '双周'),
+    ]
+
     name = models.CharField(max_length=100)
     weekly_hours = models.IntegerField(help_text='每周课时数')
+    week_pattern = models.CharField(
+        max_length=10,
+        choices=WEEK_PATTERN_CHOICES,
+        default='weekly',
+        help_text='上课周次：每周、单周（奇数周）或双周（偶数周）'
+    )
     preferred_room_type = models.CharField(
         max_length=20,
         choices=Classroom.CLASSROOM_TYPES,

@@ -83,6 +83,15 @@ import type {
             </mat-option>
           </mat-select>
         </mat-form-field>
+
+        <mat-form-field class="filter-select">
+          <mat-label>周次</mat-label>
+          <mat-select [(value)]="weekFilter">
+            <mat-option value="all">全部</mat-option>
+            <mat-option value="odd">单周</mat-option>
+            <mat-option value="even">双周</mat-option>
+          </mat-select>
+        </mat-form-field>
       </div>
 
       <div class="action-bar">
@@ -143,6 +152,8 @@ import type {
                         <div class="schedule-detail">{{ entry.classroom_name }}</div>
                         <div class="schedule-detail">{{ entry.class_name }}</div>
                         <div style="margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap;">
+                          <mat-chip *ngIf="entry.week_pattern === 'odd'" color="primary" selected>单周</mat-chip>
+                          <mat-chip *ngIf="entry.week_pattern === 'even'" color="primary" selected>双周</mat-chip>
                           <mat-chip *ngIf="entry.is_locked" color="accent" selected>锁定</mat-chip>
                           <mat-chip *ngIf="entry.is_conflict" color="warn" selected>冲突</mat-chip>
                           <button
@@ -195,6 +206,7 @@ export class TimetableComponent implements OnInit {
   selectedTeacherId: number | null = null;
   selectedClassroomId: number | null = null;
   viewMode: 'class' | 'teacher' | 'classroom' = 'class';
+  weekFilter: 'all' | 'odd' | 'even' = 'all';
   schedulingMessage: string = '';
   currentSemester: Semester | null = null;
 
@@ -218,17 +230,19 @@ export class TimetableComponent implements OnInit {
   }
 
   get currentViewTitle(): string {
+    const weekLabel = this.weekFilter === 'all' ? '' :
+      `（${this.weekFilter === 'odd' ? '单周' : '双周'}）`;
     if (this.viewMode === 'class') {
       const cls = this.classes.find(c => c.id === this.selectedClassId);
-      return cls ? `${cls.grade}年级 ${cls.name} 课表` : '';
+      return cls ? `${cls.grade}年级 ${cls.name} 课表${weekLabel}` : '';
     }
     if (this.viewMode === 'teacher') {
       const t = this.teachers.find(t => t.id === this.selectedTeacherId);
-      return t ? `${t.name} 教师课表` : '';
+      return t ? `${t.name} 教师课表${weekLabel}` : '';
     }
     if (this.viewMode === 'classroom') {
       const c = this.classrooms.find(c => c.id === this.selectedClassroomId);
-      return c ? `${c.name} 教室课表` : '';
+      return c ? `${c.name} 教室课表${weekLabel}` : '';
     }
     return '';
   }
@@ -319,7 +333,12 @@ export class TimetableComponent implements OnInit {
   }
 
   getEntryAt(day: number, period: number): ScheduleEntry[] {
-    return this.schedules.filter(e => e.day_of_week === day && e.period === period);
+    return this.schedules.filter(e => {
+      if (e.day_of_week !== day || e.period !== period) return false;
+      // 全部：单双周课都显示；单周/双周：只显示当周要上的课（每周课两周都上）
+      if (this.weekFilter === 'all') return true;
+      return e.week_pattern === 'weekly' || e.week_pattern === this.weekFilter;
+    });
   }
 
   runAutoSchedule(respectLocked = true): void {
